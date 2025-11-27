@@ -8,6 +8,13 @@ export interface Emoji {
   style: GenerationStyle; // The art style used
 }
 
+export interface EmotionConfig {
+  id: string;
+  name: string; // Display name
+  suffix: string; // Prompt suffix
+  defaultText: string;
+}
+
 export enum GenerationStyle {
   Anime = 'Anime Style, vibrant colors, thick outlines',
   Pixel = 'Pixel Art, 8-bit, retro game style',

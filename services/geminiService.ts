@@ -1,14 +1,20 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { Emoji, GenerationStyle, LineMode } from "../types";
+import { Emoji, GenerationStyle, LineMode, EmotionConfig } from "../types";
 
-// We will generate 4 variations based on common emotions
-const EMOTIONS = [
-  { name: 'Happy', suffix: 'laughing, joy, happy face, smile', defaultText: 'OK' },
-  { name: 'Sad', suffix: 'crying, sad face, tears, upset', defaultText: 'No...' },
-  { name: 'Angry', suffix: 'angry, mad, rage, fury, red face', defaultText: 'Bububu' },
-  { name: 'Love', suffix: 'heart eyes, love, blowing kiss, romantic', defaultText: 'Love' },
+// Expanded list of common LINE sticker scenarios
+export const PRESET_EMOTIONS: EmotionConfig[] = [
+  { id: 'happy', name: '開心', suffix: 'laughing, joy, happy face, smile', defaultText: 'OK' },
+  { id: 'sad', name: '難過', suffix: 'crying, sad face, tears, upset', defaultText: 'No...' },
+  { id: 'angry', name: '生氣', suffix: 'angry, mad, rage, fury, red face', defaultText: 'Bububu' },
+  { id: 'love', name: '喜愛', suffix: 'heart eyes, love, blowing kiss, romantic', defaultText: 'Love' },
+  { id: 'thanks', name: '感謝', suffix: 'bowing, thank you gesture, gratitude, sparkling', defaultText: 'Thanks' },
+  { id: 'question', name: '疑問', suffix: 'confused, question mark, thinking, head tilt', defaultText: '???' },
+  { id: 'shock', name: '驚訝', suffix: 'shocked face, wide eyes, open mouth, gasp', defaultText: '!!' },
+  { id: 'sleep', name: '睡覺', suffix: 'sleeping, zzz, drooling, closed eyes, peaceful', defaultText: 'Zzz' },
 ];
+
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const generateEmojiSet = async (
   basePrompt: string,
@@ -17,6 +23,7 @@ export const generateEmojiSet = async (
   includeText: boolean,
   customText: string,
   mode: LineMode,
+  targetEmotions: EmotionConfig[], // Dynamic list of emotions to generate
   onEmojiGenerated: (emoji: Emoji) => void
 ): Promise<void> => {
   
@@ -41,7 +48,6 @@ export const generateEmojiSet = async (
   if (!apiKey) {
     console.error("API Key is missing.");
     const errorMsg = "API Key 設定錯誤。\n\n請至 Vercel 後台 > Settings > Environment Variables\n變數名稱：VITE_API_KEY\n變數值：您的 Gemini API Key\n\n設定完後請記得 Redeploy！";
-    // We throw the error here so the UI can catch it and show the Modal
     throw new Error(errorMsg);
   }
 
@@ -49,13 +55,16 @@ export const generateEmojiSet = async (
   let successCount = 0;
   const errors: string[] = [];
 
-  const promises = EMOTIONS.map(async (emotion) => {
+  // Execute requests sequentially to avoid Rate Limiting (429)
+  for (const emotion of targetEmotions) {
     try {
       const parts: any[] = [];
       let fullPrompt = "";
       
       let textToUse = undefined;
       if (includeText) {
+        // If user provided a specific custom text for ALL stickers, use it.
+        // Otherwise use the default text associated with the emotion.
         textToUse = customText.trim() ? customText : emotion.defaultText;
       }
 
@@ -154,17 +163,25 @@ export const generateEmojiSet = async (
           successCount++;
         }
       }
+
+      // Add a small delay between requests to be nice to the rate limiter
+      await wait(1500); // Wait 1.5 seconds
+
     } catch (error: any) {
       console.error(`Error generating ${emotion.name} emoji:`, error);
       let msg = error.message || JSON.stringify(error);
       if (msg.includes('403')) msg = "API Key 權限不足或無效 (403)";
+      if (msg.includes('429')) msg = "請求過於頻繁 (429)，請稍候再試";
       if (msg.includes('SAFETY')) msg = "內容被 AI 安全機制攔截";
       if (msg.includes('503')) msg = "伺服器忙碌中，請稍後再試";
       errors.push(`${emotion.name}: ${msg}`);
+      
+      // If we hit a rate limit, wait a bit longer before the next one
+      if (msg.includes('429')) {
+          await wait(5000);
+      }
     }
-  });
-
-  await Promise.all(promises);
+  }
 
   if (successCount === 0 && errors.length > 0) {
       // If NOTHING was generated, we must alert the user

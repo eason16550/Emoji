@@ -2,9 +2,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from './components/Button';
 import { ChatPreview } from './components/ChatPreview';
-import { generateEmojiSet } from './services/geminiService';
+import { generateEmojiSet, PRESET_EMOTIONS } from './services/geminiService';
 import { processAndDownload, STICKER_SPECS, EMOJI_SPECS } from './services/imageUtils';
-import { Emoji, GenerationStyle, LineMode, TextPosition, TextSize } from './types';
+import { Emoji, GenerationStyle, LineMode, TextPosition, TextSize, EmotionConfig } from './types';
 
 // Placeholder for your LINE LIFF ID
 const LIFF_ID = "2008580210-7A4NgXJz"; 
@@ -17,6 +17,10 @@ function App() {
   const [generatedEmojis, setGeneratedEmojis] = useState<Emoji[]>([]);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   
+  // Emotion Selection State
+  const [selectedEmotionIds, setSelectedEmotionIds] = useState<string[]>(['happy', 'sad', 'angry', 'love']);
+  const [customEmotionInput, setCustomEmotionInput] = useState('');
+
   // Error Modal State
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -91,9 +95,35 @@ function App() {
     }
   };
 
+  const toggleEmotion = (id: string) => {
+    setSelectedEmotionIds(prev => 
+      prev.includes(id) 
+        ? prev.filter(e => e !== id) 
+        : [...prev, id]
+    );
+  };
+
   const handleGenerate = async () => {
     if (!uploadedImage && !prompt.trim()) {
         alert("請輸入描述或是上傳一張參考照片");
+        return;
+    }
+
+    // Build list of emotions to generate
+    const targetEmotions: EmotionConfig[] = PRESET_EMOTIONS.filter(e => selectedEmotionIds.includes(e.id));
+    
+    // Add custom emotion if entered
+    if (customEmotionInput.trim()) {
+        targetEmotions.push({
+            id: 'custom-' + Date.now(),
+            name: customEmotionInput,
+            suffix: customEmotionInput, // Use input as prompt suffix
+            defaultText: customEmotionInput
+        });
+    }
+
+    if (targetEmotions.length === 0) {
+        alert("請至少選擇或輸入一種表情！");
         return;
     }
     
@@ -109,6 +139,7 @@ function App() {
         includeText, 
         customText, 
         mode,
+        targetEmotions,
         (newEmoji) => {
           setGeneratedEmojis(prev => [...prev, newEmoji]);
         }
@@ -384,6 +415,39 @@ function App() {
                 </div>
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  4. 選擇要生成的表情
+                </label>
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  {PRESET_EMOTIONS.map((emotion) => (
+                    <button
+                      key={emotion.id}
+                      onClick={() => toggleEmotion(emotion.id)}
+                      className={`
+                        py-2 px-1 rounded-lg text-xs font-medium border transition-all
+                        ${selectedEmotionIds.includes(emotion.id)
+                          ? 'bg-[#06C755] border-[#06C755] text-white'
+                          : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}
+                      `}
+                    >
+                      {emotion.name}
+                    </button>
+                  ))}
+                </div>
+                {/* Custom Emotion Input */}
+                <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={customEmotionInput}
+                      onChange={(e) => setCustomEmotionInput(e.target.value)}
+                      placeholder="自訂表情 (例如：工作中、吃飯中...)"
+                      className="flex-1 px-3 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-[#06C755] outline-none"
+                    />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">提示：選太多表情可能會需要等待較久時間。</p>
+              </div>
+
               <div className="border-t border-gray-100 pt-4">
                  <div className="flex items-center justify-between mb-3">
                     <label className="flex items-center cursor-pointer select-none">
@@ -411,7 +475,7 @@ function App() {
                           type="text"
                           value={customText}
                           onChange={(e) => setCustomText(e.target.value)}
-                          placeholder="輸入文字 (留空則自動配詞)"
+                          placeholder="統一文字 (留空則依表情自動配詞)"
                           maxLength={10}
                           className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-[#06C755] outline-none"
                         />
