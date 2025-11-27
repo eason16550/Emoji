@@ -20,19 +20,27 @@ export const generateEmojiSet = async (
   onEmojiGenerated: (emoji: Emoji) => void
 ): Promise<void> => {
   
-  // Safe access to process.env for browsers (prevents "process is not defined" crash)
+  // Robust API Key retrieval for Vite/Vercel environments
   let apiKey = '';
   try {
-    if (typeof process !== 'undefined' && process.env) {
+    // 1. Try Vite standard (import.meta.env)
+    // @ts-ignore - Ignore TS error if types are not set for import.meta
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      apiKey = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY || '';
+    }
+    
+    // 2. Fallback to process.env (Node/Webpack/CRA)
+    if (!apiKey && typeof process !== 'undefined' && process.env) {
       apiKey = process.env.API_KEY || '';
     }
   } catch (e) {
-    console.warn("Could not read process.env.API_KEY safely");
+    console.warn("Error reading environment variables:", e);
   }
 
   if (!apiKey) {
-    console.error("API Key is missing. Please set API_KEY in your environment variables.");
-    alert("API Key 設定錯誤。請檢查 Vercel 環境變數是否設定為 API_KEY。");
+    console.error("API Key is missing.");
+    alert("API Key 設定錯誤。\n\n請至 Vercel 後台 > Settings > Environment Variables\n新增變數名稱：VITE_API_KEY\n變數值：您的 Gemini API Key\n\n設定完後請記得 Redeploy (重新部署)！");
     return;
   }
 
