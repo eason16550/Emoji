@@ -109,9 +109,9 @@ function App() {
           setGeneratedEmojis(prev => [...prev, newEmoji]);
         }
       );
-    } catch (e) {
+    } catch (e: any) {
       console.error("Main generation error:", e);
-      alert("產生過程中發生錯誤，請稍後再試。");
+      alert(e.message || "產生過程中發生錯誤，請稍後再試。");
     } finally {
       setIsGenerating(false);
     }

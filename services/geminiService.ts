@@ -40,11 +40,14 @@ export const generateEmojiSet = async (
 
   if (!apiKey) {
     console.error("API Key is missing.");
-    alert("API Key 設定錯誤。\n\n請至 Vercel 後台 > Settings > Environment Variables\n新增變數名稱：VITE_API_KEY\n變數值：您的 Gemini API Key\n\n設定完後請記得 Redeploy (重新部署)！");
-    return;
+    const errorMsg = "API Key 設定錯誤。\n\n請至 Vercel 後台 > Settings > Environment Variables\n變數名稱：VITE_API_KEY\n變數值：您的 Gemini API Key\n\n設定完後請記得 Redeploy！";
+    alert(errorMsg);
+    throw new Error(errorMsg);
   }
 
   const ai = new GoogleGenAI({ apiKey: apiKey });
+  let successCount = 0;
+  const errors: string[] = [];
 
   const promises = EMOTIONS.map(async (emotion) => {
     try {
@@ -128,7 +131,11 @@ export const generateEmojiSet = async (
         },
       });
 
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (!response.candidates?.[0]?.content?.parts) {
+          throw new Error("API returned no content (Possible Safety Filter)");
+      }
+
+      for (const part of response.candidates[0].content.parts) {
         if (part.inlineData) {
           const base64Data = part.inlineData.data;
           const mimeType = part.inlineData.mimeType || 'image/png';
@@ -144,12 +151,23 @@ export const generateEmojiSet = async (
           };
           
           onEmojiGenerated(newEmoji);
+          successCount++;
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error generating ${emotion.name} emoji:`, error);
+      let msg = error.message || JSON.stringify(error);
+      if (msg.includes('403')) msg = "API Key 權限不足或無效 (403)";
+      if (msg.includes('SAFETY')) msg = "內容被 AI 安全機制攔截";
+      if (msg.includes('503')) msg = "伺服器忙碌中，請稍後再試";
+      errors.push(`${emotion.name}: ${msg}`);
     }
   });
 
   await Promise.all(promises);
+
+  if (successCount === 0 && errors.length > 0) {
+      // If NOTHING was generated, we must alert the user
+      throw new Error(`生成失敗。原因:\n${errors.join('\n')}`);
+  }
 };
