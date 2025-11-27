@@ -1,0 +1,5 @@
+{
+  "name": "EmojiMaker AI for LINE",
+  "description": "A creative tool to generate custom sticker sets and emojis suitable for LINE using Gemini AI.",
+  "requestFramePermissions": []
+}
