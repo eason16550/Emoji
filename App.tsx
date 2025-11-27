@@ -17,6 +17,9 @@ function App() {
   const [generatedEmojis, setGeneratedEmojis] = useState<Emoji[]>([]);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   
+  // Progress tracking
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
+  
   // Emotion Selection State
   const [selectedEmotionIds, setSelectedEmotionIds] = useState<string[]>(['happy', 'sad', 'angry', 'love']);
   const [customEmotionInput, setCustomEmotionInput] = useState('');
@@ -128,6 +131,7 @@ function App() {
     }
     
     setIsGenerating(true);
+    setProgress({ current: 0, total: targetEmotions.length });
     setGeneratedEmojis([]);
     setGenerationError(null); // Clear previous errors
 
@@ -142,6 +146,9 @@ function App() {
         targetEmotions,
         (newEmoji) => {
           setGeneratedEmojis(prev => [...prev, newEmoji]);
+        },
+        (current, total) => {
+          setProgress({ current, total });
         }
       );
     } catch (e: any) {
@@ -150,6 +157,7 @@ function App() {
       setGenerationError(e.message || "產生過程中發生錯誤，請稍後再試。");
     } finally {
       setIsGenerating(false);
+      setProgress({ current: 0, total: 0 });
     }
   };
 
@@ -532,7 +540,9 @@ function App() {
                   isLoading={isGenerating}
                   className="w-full py-3 text-lg"
                 >
-                  {isGenerating ? `正在繪製${mode === 'STICKER' ? '貼圖' : '表情貼'}...` : `開始生成${mode === 'STICKER' ? '貼圖' : '表情貼'}`}
+                  {isGenerating ? 
+                    `正在繪製 (${progress.current}/${progress.total})...` : 
+                    `開始生成${mode === 'STICKER' ? '貼圖' : '表情貼'}`}
                 </Button>
               </div>
             </div>
