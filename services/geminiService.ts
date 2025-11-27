@@ -41,7 +41,7 @@ export const generateEmojiSet = async (
   if (!apiKey) {
     console.error("API Key is missing.");
     const errorMsg = "API Key 設定錯誤。\n\n請至 Vercel 後台 > Settings > Environment Variables\n變數名稱：VITE_API_KEY\n變數值：您的 Gemini API Key\n\n設定完後請記得 Redeploy！";
-    alert(errorMsg);
+    // We throw the error here so the UI can catch it and show the Modal
     throw new Error(errorMsg);
   }
 

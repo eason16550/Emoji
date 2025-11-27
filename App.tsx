@@ -17,6 +17,9 @@ function App() {
   const [generatedEmojis, setGeneratedEmojis] = useState<Emoji[]>([]);
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   
+  // Error Modal State
+  const [generationError, setGenerationError] = useState<string | null>(null);
+
   // Text options
   const [includeText, setIncludeText] = useState(false);
   const [customText, setCustomText] = useState('');
@@ -96,6 +99,7 @@ function App() {
     
     setIsGenerating(true);
     setGeneratedEmojis([]);
+    setGenerationError(null); // Clear previous errors
 
     try {
       await generateEmojiSet(
@@ -111,9 +115,20 @@ function App() {
       );
     } catch (e: any) {
       console.error("Main generation error:", e);
-      alert(e.message || "產生過程中發生錯誤，請稍後再試。");
+      // Instead of alert, set state to show Error Modal
+      setGenerationError(e.message || "產生過程中發生錯誤，請稍後再試。");
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const copyErrorToClipboard = () => {
+    if (generationError) {
+      navigator.clipboard.writeText(generationError).then(() => {
+        alert("已複製錯誤訊息");
+      }).catch(() => {
+        alert("複製失敗，請手動長按文字複製");
+      });
     }
   };
 
@@ -207,10 +222,45 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans pb-20">
+    <div className="min-h-screen bg-gray-50 text-gray-800 font-sans pb-20 relative">
+      {/* --- ERROR MODAL --- */}
+      {generationError && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col max-h-[80vh]">
+                <div className="bg-red-50 p-4 border-b border-red-100 flex items-center gap-3">
+                    <div className="bg-red-100 p-2 rounded-full text-red-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    </div>
+                    <h3 className="font-bold text-red-900">生成失敗</h3>
+                </div>
+                <div className="p-4 overflow-y-auto flex-1">
+                    <p className="text-sm text-gray-600 mb-2 font-bold">請複製以下錯誤代碼：</p>
+                    <div className="bg-gray-100 p-3 rounded-lg border border-gray-200 font-mono text-xs text-gray-700 break-all select-all whitespace-pre-wrap">
+                        {generationError}
+                    </div>
+                </div>
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+                    <button 
+                        onClick={copyErrorToClipboard}
+                        className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        複製訊息
+                    </button>
+                    <button 
+                        onClick={() => setGenerationError(null)}
+                        className="flex-1 bg-gray-800 text-white py-2 rounded-lg text-sm font-medium hover:bg-gray-700 transition-colors"
+                    >
+                        關閉
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       {/* Header */}
       {!isInClient && (
-        <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
             <div className="flex items-center gap-2">
                 <div className="w-8 h-8 bg-[#06C755] rounded-lg flex items-center justify-center text-white font-bold text-lg">
@@ -226,7 +276,7 @@ function App() {
 
       {/* LIFF Header */}
       {isInClient && (
-         <div className="bg-[#242d38] text-white px-4 py-3 sticky top-0 z-50 flex items-center justify-between shadow-md">
+         <div className="bg-[#242d38] text-white px-4 py-3 sticky top-0 z-40 flex items-center justify-between shadow-md">
             <div className="flex items-center gap-2">
                 {lineProfile?.pictureUrl && (
                     <img src={lineProfile.pictureUrl} alt="Profile" className="w-8 h-8 rounded-full border border-white/20" />
