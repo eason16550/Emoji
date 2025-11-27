@@ -6,7 +6,7 @@ import { generateEmojiSet } from './services/geminiService';
 import { processAndDownload, STICKER_SPECS, EMOJI_SPECS } from './services/imageUtils';
 import { Emoji, GenerationStyle, LineMode, TextPosition, TextSize } from './types';
 
-// Placeholder for your LINE LIFF ID (Get this from LINE Developers Console)
+// Placeholder for your LINE LIFF ID
 const LIFF_ID = "2008580210-7A4NgXJz"; 
 
 function App() {
@@ -20,13 +20,12 @@ function App() {
   // Text options
   const [includeText, setIncludeText] = useState(false);
   const [customText, setCustomText] = useState('');
-  
-  // New Text Customizations
   const [textPosition, setTextPosition] = useState<TextPosition>('top-right');
   const [textSize, setTextSize] = useState<TextSize>('md');
 
   // LINE LIFF State
   const [isLiffInit, setIsLiffInit] = useState(false);
+  const [liffError, setLiffError] = useState<string | null>(null);
   const [lineProfile, setLineProfile] = useState<{ displayName: string, pictureUrl?: string } | null>(null);
   const [isInClient, setIsInClient] = useState(false);
 
@@ -37,26 +36,30 @@ function App() {
     const initLiff = async () => {
       try {
         if (window.liff) {
-            // Note: In a real deployment, replace LIFF_ID with your actual ID.
-            // If ID is invalid/empty, it might fail, so we wrap in try/catch.
-            // For now, we just check if the SDK is loaded.
-            await window.liff.init({ liffId: LIFF_ID }).catch((err: any) => {
-                // If LIFF ID is not set, we just proceed as a web app
-                console.log("LIFF init failed (expected if no valid ID provided):", err);
-            });
-
+            console.log("Initializing LIFF with ID:", LIFF_ID);
+            // Attempt to initialize LIFF
+            await window.liff.init({ liffId: LIFF_ID });
+            
             setIsLiffInit(true);
             
             if (window.liff.isInClient()) {
                 setIsInClient(true);
-                const profile = await window.liff.getProfile().catch(console.error);
+                const profile = await window.liff.getProfile().catch((e: any) => {
+                    console.warn("Failed to get profile:", e);
+                    return null;
+                });
                 if (profile) {
                     setLineProfile(profile);
                 }
             }
+        } else {
+            // Fallback for regular browser if script didn't load (unlikely but possible)
+            console.warn("LIFF SDK not found on window");
         }
-      } catch (error) {
-        console.error("LIFF Error:", error);
+      } catch (error: any) {
+        console.error("LIFF Init Error:", error);
+        // Set error state to show the debug screen instead of a white screen
+        setLiffError(error.message || JSON.stringify(error));
       }
     };
     initLiff();
@@ -70,7 +73,6 @@ function App() {
         alert("圖片大小請小於 5MB");
         return;
       }
-      
       const reader = new FileReader();
       reader.onloadend = () => {
         setUploadedImage(reader.result as string);
@@ -125,18 +127,15 @@ function App() {
     processAndDownload(emoji.dataUrl, spec, `LINE_Emoji_${emoji.emotion}`, emoji.text, emoji.style, textPosition, textSize);
   };
 
-  // Helper to map TextPosition to CSS
   const getPreviewPositionStyle = (pos: TextPosition): React.CSSProperties => {
     const padding = '5%';
     switch (pos) {
       case 'top-left': return { top: padding, left: padding };
       case 'top-center': return { top: padding, left: '50%', transform: 'translateX(-50%)' };
       case 'top-right': return { top: padding, right: padding, textAlign: 'right' };
-      
       case 'middle-left': return { top: '50%', left: padding, transform: 'translateY(-50%)' };
       case 'middle-center': return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' };
       case 'middle-right': return { top: '50%', right: padding, transform: 'translateY(-50%)', textAlign: 'right' };
-      
       case 'bottom-left': return { bottom: padding, left: padding };
       case 'bottom-center': return { bottom: padding, left: '50%', transform: 'translateX(-50%)' };
       case 'bottom-right': return { bottom: padding, right: padding, textAlign: 'right' };
@@ -145,7 +144,6 @@ function App() {
   };
 
   const getPreviewSizeStyle = (size: TextSize) => {
-    // These values should roughly match the visual weight of imageUtils logic relative to the container
     switch(size) {
       case 'sm': return 'clamp(0.8rem, 15cqi, 2rem)';
       case 'md': return 'clamp(1rem, 22cqi, 3rem)';
@@ -173,9 +171,44 @@ function App() {
     { label: '扁平設計', value: GenerationStyle.Flat, icon: '🔷' },
   ];
 
+  // --- DEBUG SCREEN FOR LIFF ERRORS ---
+  if (liffError) {
+    return (
+      <div className="min-h-screen bg-red-50 p-6 flex flex-col items-center justify-center text-red-900">
+        <div className="bg-white p-6 rounded-2xl shadow-xl max-w-md w-full border border-red-200">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+             🚫 LIFF 連線失敗
+          </h2>
+          <p className="mb-4 text-sm text-gray-700">
+            請將下方的網址複製，並貼到 LINE Developers Console 的 <strong>Endpoint URL</strong> 欄位中。
+          </p>
+          
+          <div className="bg-gray-100 p-3 rounded-lg font-mono text-xs break-all border border-gray-300 mb-4 select-all">
+            {window.location.href}
+          </div>
+
+          <div className="text-xs text-red-600 font-mono bg-red-50 p-3 rounded mb-4">
+             Error: {liffError}
+          </div>
+
+          <div className="text-xs text-gray-500">
+             目前的 LIFF ID: {LIFF_ID}
+          </div>
+          
+          <button 
+            onClick={() => window.location.reload()}
+            className="mt-4 w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700"
+          >
+            重新整理
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 text-gray-800 font-sans pb-20">
-      {/* Header - Simplified if running inside LINE Client to save space */}
+      {/* Header */}
       {!isInClient && (
         <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -187,19 +220,11 @@ function App() {
                 EmojiMaker <span className="text-[#06C755]">AI</span>
                 </h1>
             </div>
-            <a 
-                href="https://ai.google.dev/" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-xs text-gray-500 hover:text-[#06C755]"
-            >
-                Powered by Gemini
-            </a>
             </div>
         </header>
       )}
 
-      {/* LIFF Header (Only visible in LINE) */}
+      {/* LIFF Header */}
       {isInClient && (
          <div className="bg-[#242d38] text-white px-4 py-3 sticky top-0 z-50 flex items-center justify-between shadow-md">
             <div className="flex items-center gap-2">
@@ -220,17 +245,14 @@ function App() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* Left Column: Controls */}
+          {/* Left Column */}
           <div className="lg:col-span-5 space-y-6">
             
-            {/* Mode Selection */}
             <div className="bg-white rounded-2xl p-1 shadow-sm border border-gray-100 flex">
               <button 
                 onClick={() => setMode('STICKER')}
                 className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
-                  mode === 'STICKER' 
-                    ? 'bg-[#06C755] text-white shadow-md' 
-                    : 'text-gray-500 hover:bg-gray-50'
+                  mode === 'STICKER' ? 'bg-[#06C755] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
                 }`}
               >
                 製作貼圖 (Sticker)
@@ -238,19 +260,15 @@ function App() {
               <button 
                 onClick={() => setMode('EMOJI')}
                 className={`flex-1 py-3 px-4 rounded-xl text-sm font-medium transition-all ${
-                  mode === 'EMOJI' 
-                    ? 'bg-[#06C755] text-white shadow-md' 
-                    : 'text-gray-500 hover:bg-gray-50'
+                  mode === 'EMOJI' ? 'bg-[#06C755] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
                 }`}
               >
                 製作表情貼 (Emoji)
               </button>
             </div>
 
-            {/* Input Section */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-6">
               
-              {/* Image Upload */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   1. 參考照片 <span className="text-gray-400 font-normal">(可選)</span>
@@ -279,7 +297,6 @@ function App() {
                 <input type="file" ref={fileInputRef} onChange={handleImageUpload} className="hidden" accept="image/*" />
               </div>
 
-              {/* Prompt */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   2. {uploadedImage ? '補充描述 (可選)' : '主角 / 主題描述'}
@@ -294,7 +311,6 @@ function App() {
                 />
               </div>
 
-              {/* Style */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   3. 選擇藝術風格
@@ -318,7 +334,6 @@ function App() {
                 </div>
               </div>
 
-              {/* Text Option Section */}
               <div className="border-t border-gray-100 pt-4">
                  <div className="flex items-center justify-between mb-3">
                     <label className="flex items-center cursor-pointer select-none">
@@ -340,8 +355,6 @@ function App() {
 
                  {includeText && (
                    <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-200 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                      
-                      {/* Text Input */}
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-1">文字內容</label>
                         <input
@@ -353,8 +366,6 @@ function App() {
                           className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 focus:ring-2 focus:ring-[#06C755] outline-none"
                         />
                       </div>
-
-                      {/* Text Position Grid */}
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-2">位置</label>
                         <div className="grid grid-cols-3 gap-1 w-24">
@@ -378,8 +389,6 @@ function App() {
                           ))}
                         </div>
                       </div>
-
-                      {/* Text Size */}
                       <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase mb-2">大小</label>
                         <div className="flex gap-2">
@@ -475,7 +484,6 @@ function App() {
                         <span>聊天室預覽模式</span>
                     </div>
                 )}
-                {/* Pass state to preview */}
                 <ChatPreview selectedEmojis={generatedEmojis} textPosition={textPosition} textSize={textSize} />
                 <p className="mt-8 text-center text-sm text-gray-400 max-w-md">
                    注意：此工具會嘗試自動去除白色背景並調整圖片尺寸，但複雜的背景可能無法完美去背。

@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { Emoji, GenerationStyle, LineMode } from "../types";
 
@@ -19,11 +20,19 @@ export const generateEmojiSet = async (
   onEmojiGenerated: (emoji: Emoji) => void
 ): Promise<void> => {
   
-  const apiKey = process.env.API_KEY;
+  // Safe access to process.env for browsers (prevents "process is not defined" crash)
+  let apiKey = '';
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      apiKey = process.env.API_KEY || '';
+    }
+  } catch (e) {
+    console.warn("Could not read process.env.API_KEY safely");
+  }
 
   if (!apiKey) {
     console.error("API Key is missing. Please set API_KEY in your environment variables.");
-    alert("API Key 設定錯誤。請檢查環境變數是否設定為 API_KEY。");
+    alert("API Key 設定錯誤。請檢查 Vercel 環境變數是否設定為 API_KEY。");
     return;
   }
 
@@ -34,14 +43,11 @@ export const generateEmojiSet = async (
       const parts: any[] = [];
       let fullPrompt = "";
       
-      // LOGIC CHANGE: We no longer ask AI to generate text inside the image.
-      // We process the text intention here to attach it later.
       let textToUse = undefined;
       if (includeText) {
         textToUse = customText.trim() ? customText : emotion.defaultText;
       }
 
-      // Mode specific instructions
       const modeInstruction = mode === 'EMOJI' 
         ? `
           - TASK: Create a LINE Emoji (表情貼).
@@ -57,7 +63,6 @@ export const generateEmojiSet = async (
           - Aspect Ratio: Strictly Square (1:1).
         `;
 
-      // Handle Image Input
       if (referenceImage) {
         const matches = referenceImage.match(/^data:(.+);base64,(.+)$/);
         if (matches) {
@@ -126,8 +131,8 @@ export const generateEmojiSet = async (
             dataUrl,
             prompt: fullPrompt,
             emotion: emotion.name,
-            text: textToUse, // Attach the text intention to the object
-            style: style // Save style for post-processing
+            text: textToUse,
+            style: style
           };
           
           onEmojiGenerated(newEmoji);
