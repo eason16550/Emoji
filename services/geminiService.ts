@@ -1,8 +1,5 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Emoji, GenerationStyle, LineMode } from "../types";
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // We will generate 4 variations based on common emotions
 const EMOTIONS = [
@@ -22,6 +19,16 @@ export const generateEmojiSet = async (
   onEmojiGenerated: (emoji: Emoji) => void
 ): Promise<void> => {
   
+  const apiKey = process.env.API_KEY;
+
+  if (!apiKey) {
+    console.error("API Key is missing. Please set API_KEY in your environment variables.");
+    alert("API Key 設定錯誤。請檢查環境變數是否設定為 API_KEY。");
+    return;
+  }
+
+  const ai = new GoogleGenAI({ apiKey: apiKey });
+
   const promises = EMOTIONS.map(async (emotion) => {
     try {
       const parts: any[] = [];
