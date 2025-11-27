@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { Emoji, GenerationStyle, LineMode, EmotionConfig } from "../types";
 
@@ -174,9 +173,11 @@ export const generateEmojiSet = async (
           }
         }
 
-        // SUCCESS DELAY: Wait 5 seconds to stay under the ~15 RPM limit safely
+        // SUCCESS DELAY: 
+        // Free tier is ~15 RPM (1 req / 4 sec). 
+        // We set a conservative 10s delay between requests to be safe and avoid burst limits.
         if (i < targetEmotions.length - 1) {
-            await wait(5000); 
+            await wait(10000); 
         }
 
       } catch (error: any) {
@@ -186,12 +187,19 @@ export const generateEmojiSet = async (
             // RATE LIMIT HIT
             attempts++;
             if (attempts < maxRetries) {
-                console.warn(`Rate limit hit for ${emotion.name}. Retrying in ${12 * attempts} seconds...`);
-                // Exponential Backoff: Wait 12s, then 24s...
-                await wait(12000 * attempts); 
+                // Try to extract exact wait time from error message: "Please retry in 36.51s"
+                let waitTime = 15000; // Default 15s
+                const match = msg.match(/retry in (\d+(\.\d+)?)s/);
+                if (match && match[1]) {
+                    // Wait exact time + 2 seconds buffer
+                    waitTime = Math.ceil(parseFloat(match[1])) * 1000 + 2000;
+                }
+
+                console.warn(`Rate limit hit for ${emotion.name}. Waiting ${waitTime/1000}s...`);
+                await wait(waitTime);
                 continue; // Retry loop
             } else {
-                msg = "請求過於頻繁 (429)，已達重試上限。";
+                msg = "請求過於頻繁 (429)，已達重試上限。請稍後再試。";
                 errors.push(`${emotion.name}: ${msg}`);
             }
         } else {
